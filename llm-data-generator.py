@@ -31,7 +31,7 @@ class CustomComponent(Component):
     all_categories: List[Data] = []
     all_products: List[Data] = []
     all_users: List[Data] = []
-    def generate_categoty_prompt(self) -> str:
+    def generate_category_prompt(self) -> str:
         return (
             f"Generate a list of '{self.num_categories}' unique, creative, and diverse top-level categories for an online marketplace focused on the theme of '{self.store_theme}'."
             "Give each category a UUID, name, and description. These categories should be specific to the marketplace theme, but general enough to allow subcategories."
