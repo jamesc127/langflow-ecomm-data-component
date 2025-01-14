@@ -1,7 +1,7 @@
 from langflow.custom import Component
 from langflow.io import Output
 from langflow.schema import Data
-from langflow.logging import logger as llog
+from langflow.logging import logger
 from langflow.inputs import IntInput, StrInput, HandleInput
 from langflow.io import Output
 from langchain.schema import HumanMessage
@@ -28,6 +28,7 @@ class CustomComponent(Component):
         Output(name="products_dataset", display_name="Products", method="create_products"),
         Output(name="users_dataset", display_name="Users", method="create_users"),
     ]
+    llog = logger
     all_categories: List[Data] = []
     all_products: List[Data] = []
     all_users: List[Data] = []
@@ -36,7 +37,8 @@ class CustomComponent(Component):
             f"Generate a list of '{self.num_categories}' unique, creative, and diverse top-level categories for an online marketplace focused on the theme of '{self.store_theme}'."
             "Give each category a UUID, name, and description. These categories should be specific to the marketplace theme, but general enough to allow subcategories."
             "For each category, create three subcategories. Each with their own UUID, name, and description. Also include the UUID of the parent category."
-            "Return the answer in JSON format and strictly adhere to the following JSON schema"
+            "Return the answer in JSON format and strictly adhere to the following JSON schema. The response must be a valid JSON array starting with '[' and ending with ']'"
+            "Do not format your response as markdown, or include any other text other than properly formatted JSON."
             """
             {
                 "id" : "string",
@@ -60,7 +62,7 @@ class CustomComponent(Component):
             f"Generate a list of {self.num_products} products for an online marketplace focused on {self.store_theme}. "
             "Return a JSON array where each element represents a product. "
             f"Use only the following categories:\n{json.dumps(category_info, indent=2)}\n"
-            "The response must be a valid JSON array starting with '[' and ending with ']'. "
+            "The response must be a valid JSON array starting with '[' and ending with ']'. Do not format your response as markdown, or include any other text other than properly formatted JSON."
             "Each product object in the array must follow this exact schema:"
             """
             [
@@ -106,7 +108,7 @@ class CustomComponent(Component):
             f"Products:\n{json.dumps(product_info[:10], indent=2)}...(more products available)\n"
             "For each user, create a purchase history of 3-5 items from the available products list, "
             "and a list of 2-3 favorite categories from the available categories. "
-            "The response must be a valid JSON array starting with '[' and ending with ']'. "
+            "The response must be a valid JSON array starting with '[' and ending with ']'. Do not format your response as markdown, or include any other text other than properly formatted JSON."
             "Each user object in the array must follow this exact schema:"
             """
             [
@@ -135,33 +137,33 @@ class CustomComponent(Component):
             ]
             """
         )
-    def validate_llm_response(response_content: str, context: str = "") -> tuple[bool, str]:
+    def validate_llm_response(self,response_content: str, context: str = "") -> tuple[bool, str]:
         """
         Validates LLM response content and ensures it's properly formatted JSON
         Returns: (is_valid: bool, cleaned_content: str)
         """
         try:
             # Log raw response for debugging
-            llog.debug(f"Raw LLM response for {context}: {response_content[:500]}...")            
+            self.llog.debug(f"Raw LLM response for {context}: {response_content[:500]}...")            
             # Clean and validate response
             cleaned_content = response_content.strip()
             if not cleaned_content.startswith('['):
-                llog.warning(f"Response for {context} doesn't start with '[', attempting to extract JSON")
+                self.llog.warning(f"Response for {context} doesn't start with '[', attempting to extract JSON")
                 start_idx = cleaned_content.find('[')
                 if start_idx == -1:
-                    llog.error(f"No JSON array found in response for {context}")
+                    self.llog.error(f"No JSON array found in response for {context}")
                     return False, cleaned_content
                 cleaned_content = cleaned_content[start_idx:]
-                llog.info(f"Extracted JSON content for {context}: {cleaned_content[:500]}...")
+                self.llog.info(f"Extracted JSON content for {context}: {cleaned_content[:500]}...")
             # Validate JSON structure
             json.loads(cleaned_content)  # This will raise JSONDecodeError if invalid
             return True, cleaned_content
         except json.JSONDecodeError as e:
-            llog.error(f"Invalid JSON in {context} at position {e.pos}: {e.msg}")
-            llog.error(f"Problematic content: {response_content[max(0, e.pos-50):min(len(response_content), e.pos+50)]}")
+            self.llog.error(f"Invalid JSON in {context} at position {e.pos}: {e.msg}")
+            self.llog.error(f"Problematic content: {response_content[max(0, e.pos-50):min(len(response_content), e.pos+50)]}")
             return False, response_content
         except Exception as e:
-            llog.error(f"Unexpected error validating {context}: {str(e)}")
+            self.llog.error(f"Unexpected error validating {context}: {str(e)}")
             return False, response_content
     def safe_llm_invoke(self, prompt: str, context: str) -> tuple[bool, str]:
         """
@@ -169,22 +171,21 @@ class CustomComponent(Component):
         Returns: (success: bool, content: str)
         """
         try:
-            llog.info(f"Sending prompt for {context}")
+            self.llog.info(f"Sending prompt for {context}")
             response = self.llm.invoke([HumanMessage(content=prompt)])
 
             if not response or not hasattr(response, 'content'):
-                llog.error(f"Invalid response object for {context}")
+                self.llog.error(f"Invalid response object for {context}")
                 return False, "Invalid LLM response object"
 
             is_valid, content = self.validate_llm_response(response.content, context)
             return is_valid, content
 
         except Exception as e:
-            llog.error(f"Error invoking LLM for {context}: {str(e)}")
+            self.llog.error(f"Error invoking LLM for {context}: {str(e)}")
             return False, str(e)
     def create_categories(self) -> List[Data]:
         success, response_content = self.safe_llm_invoke(
-            self,
             prompt=self.generate_category_prompt(),
             context="category generation"
         )
@@ -193,18 +194,18 @@ class CustomComponent(Component):
                               "error": f"Failed to get valid response: {response_content}"})]
         try:
             categories = json.loads(response_content)
-            llog.info(f"Successfully generated {len(categories)} categories")
+            self.llog.info(f"Successfully generated {len(categories)} categories")
             # Process categories with detailed logging
             for category in categories:
                 try:
                     name = category.get("name", "")
                     if not name:
-                        llog.warning(f"Category missing name: {category}")
+                        self.llog.warning(f"Category missing name: {category}")
                         continue
                     description = category.get("description", "")
                     category_id = category.get("id")
                     if not category_id:
-                        llog.warning(f"Category missing ID: {category}")
+                        self.llog.warning(f"Category missing ID: {category}")
                         continue                   
                     self.all_categories.append(Data(
                         data={
@@ -216,16 +217,16 @@ class CustomComponent(Component):
                     ))
                     # Process subcategories
                     subcategories = category.get("subcategories", [])
-                    llog.debug(f"Processing {len(subcategories)} subcategories for {name}")
+                    self.llog.debug(f"Processing {len(subcategories)} subcategories for {name}")
                     for subcategory in subcategories:
                         try:
                             sub_name = subcategory.get("name", "")
                             if not sub_name:
-                                llog.warning(f"Subcategory missing name: {subcategory}")
+                                self.llog.warning(f"Subcategory missing name: {subcategory}")
                                 continue
                             sub_id = subcategory.get("id")
                             if not sub_id:
-                                llog.warning(f"Subcategory missing ID: {subcategory}")
+                                self.llog.warning(f"Subcategory missing ID: {subcategory}")
                                 continue
                             self.all_categories.append(Data(
                                 data={
@@ -237,20 +238,20 @@ class CustomComponent(Component):
                                 }
                             ))
                         except Exception as e:
-                            llog.error(f"Error processing subcategory: {str(e)}")
+                            self.llog.error(f"Error processing subcategory: {str(e)}")
                             continue
                 except Exception as e:
-                    llog.error(f"Error processing category: {str(e)}")
+                    self.llog.error(f"Error processing category: {str(e)}")
                     continue
-            llog.info(f"Successfully processed {len(self.all_categories)} total categories and subcategories")
+            self.llog.info(f"Successfully processed {len(self.all_categories)} total categories and subcategories")
             return self.all_categories
         except Exception as e:
-            llog.error(f"Error processing categories response: {str(e)}")
+            self.llog.error(f"Error processing categories response: {str(e)}")
             return [Data(data={"text": "Error processing categories", 
                               "error": f"Failed to process response: {str(e)}"})]
     def create_products(self) -> List[Data]:
         if not self.all_categories:
-            llog.error("Attempting to create products without categories")
+            self.llog.error("Attempting to create products without categories")
             return [Data(data={
                 "text": "Error: No categories available",
                 "error": "Categories must be generated first"
@@ -270,12 +271,11 @@ class CustomComponent(Component):
                             f"Parent ID: {cat_data['parent_id']}"
                         )
                 except KeyError as e:
-                    llog.warning(f"Missing required field in category data: {e}")
+                    self.llog.warning(f"Missing required field in category data: {e}")
                     continue
-            llog.info(f"Prepared {len(category_info)} categories for product generation")
+            self.llog.info(f"Prepared {len(category_info)} categories for product generation")
             # Generate products using LLM
             success, response_content = self.safe_llm_invoke(
-                self,
                 prompt=self.generate_products_prompt(category_info),
                 context="product generation"
             )
@@ -286,32 +286,32 @@ class CustomComponent(Component):
                 })]
             # Process products
             products = json.loads(response_content)
-            llog.info(f"Successfully generated {len(products)} products")
+            self.llog.info(f"Successfully generated {len(products)} products")
             for product in products:
                 try:
                     # Validate required fields
                     required_fields = ["id", "name", "description", "category_id", "subcategory_id", "price"]
                     missing_fields = [field for field in required_fields if not product.get(field)]
                     if missing_fields:
-                        llog.warning(f"Product missing required fields {missing_fields}: {product}")
+                        self.llog.warning(f"Product missing required fields {missing_fields}: {product}")
                         continue
                     # Validate category references
                     category_id = product["category_id"]
                     subcategory_id = product["subcategory_id"]
                     if not any(c.data["id"] == category_id for c in self.all_categories):
-                        llog.warning(f"Product references invalid category_id {category_id}")
+                        self.llog.warning(f"Product references invalid category_id {category_id}")
                         continue
                     if not any(c.data["id"] == subcategory_id for c in self.all_categories):
-                        llog.warning(f"Product references invalid subcategory_id {subcategory_id}")
+                        self.llog.warning(f"Product references invalid subcategory_id {subcategory_id}")
                         continue
                     # Validate numeric fields
                     try:
                         price = float(product["price"])
                         if price <= 0:
-                            llog.warning(f"Invalid price {price} for product {product['id']}")
+                            self.llog.warning(f"Invalid price {price} for product {product['id']}")
                             continue
                     except (ValueError, TypeError):
-                        llog.warning(f"Invalid price format for product {product['id']}")
+                        self.llog.warning(f"Invalid price format for product {product['id']}")
                         continue
                     # Add validated product
                     self.all_products.append(Data(
@@ -330,19 +330,19 @@ class CustomComponent(Component):
                         }
                     ))
                 except Exception as e:
-                    llog.error(f"Error processing product: {str(e)}")
+                    self.llog.error(f"Error processing product: {str(e)}")
                     continue
-            llog.info(f"Successfully processed {len(self.all_products)} products")
+            self.llog.info(f"Successfully processed {len(self.all_products)} products")
             return self.all_products
         except Exception as e:
-            llog.error(f"Error in create_products: {str(e)}")
+            self.llog.error(f"Error in create_products: {str(e)}")
             return [Data(data={
                 "text": "Error generating products",
                 "error": f"Unexpected error: {str(e)}"
             })]
     def create_users(self) -> List[Data]:
         if not self.all_products or not self.all_categories:
-            llog.error("Attempting to create users without products or categories")
+            self.llog.error("Attempting to create users without products or categories")
             return [Data(data={
                 "text": "Error: Products and categories must be generated first",
                 "error": "Products and categories must be generated first"
@@ -362,10 +362,10 @@ class CustomComponent(Component):
                                 "name": cat_data["name"]
                             })
                         except (KeyError, TypeError) as e:
-                            llog.warning(f"Missing or invalid fields in category: {str(e)}")
+                            self.llog.warning(f"Missing or invalid fields in category: {str(e)}")
                             continue
                 except Exception as e:
-                    llog.warning(f"Invalid category data structure: {str(e)}")
+                    self.llog.warning(f"Invalid category data structure: {str(e)}")
                     continue
             # Process products
             for prod in self.all_products:
@@ -379,15 +379,14 @@ class CustomComponent(Component):
                             "category_id": prod_data["category_id"]
                         })
                     except (KeyError, TypeError) as e:
-                        llog.warning(f"Missing or invalid fields in product: {str(e)}")
+                        self.llog.warning(f"Missing or invalid fields in product: {str(e)}")
                         continue
                 except Exception as e:
-                    llog.warning(f"Invalid product data structure: {str(e)}")
+                    self.llog.warning(f"Invalid product data structure: {str(e)}")
                     continue
-            llog.info(f"Prepared {len(category_info)} categories and {len(product_info)} products for user generation")
+            self.llog.info(f"Prepared {len(category_info)} categories and {len(product_info)} products for user generation")
             # Generate users using LLM
             success, response_content = self.safe_llm_invoke(
-                self,
                 prompt=self.generate_users_prompt(category_info, product_info),
                 context="user generation"
             )
@@ -398,14 +397,14 @@ class CustomComponent(Component):
                 })]
             # Process users
             users = json.loads(response_content)
-            llog.info(f"Successfully generated {len(users)} users")
+            self.llog.info(f"Successfully generated {len(users)} users")
             for user in users:
                 try:
                     # Validate required fields
                     required_fields = ["id", "name", "email", "join_date"]
                     missing_fields = [field for field in required_fields if not user.get(field)]
                     if missing_fields:
-                        llog.warning(f"User missing required fields {missing_fields}: {user}")
+                        self.llog.warning(f"User missing required fields {missing_fields}: {user}")
                         continue
                     try:
                         # Validate purchase history
@@ -415,14 +414,14 @@ class CustomComponent(Component):
                             try:
                                 product_id = purchase.get("product_id")
                                 if not product_id or not any(p.data["id"] == product_id for p in self.all_products):
-                                    llog.warning(f"Invalid product_id in purchase history: {product_id}")
+                                    self.llog.warning(f"Invalid product_id in purchase history: {product_id}")
                                     continue
                                 verified_purchases.append(purchase)
                             except Exception as e:
-                                llog.warning(f"Error processing purchase: {str(e)}")
+                                self.llog.warning(f"Error processing purchase: {str(e)}")
                                 continue
                     except Exception as e:
-                        llog.error(f"Error processing purchase history: {str(e)}")
+                        self.llog.error(f"Error processing purchase history: {str(e)}")
                         verified_purchases = []
                     try:
                         # Validate favorite categories
@@ -432,20 +431,20 @@ class CustomComponent(Component):
                             try:
                                 category_id = cat.get("category_id")
                                 if not category_id or not any(c.data["id"] == category_id for c in self.all_categories):
-                                    llog.warning(f"Invalid category_id in favorites: {category_id}")
+                                    self.llog.warning(f"Invalid category_id in favorites: {category_id}")
                                     continue
                                 verified_categories.append(cat)
                             except Exception as e:
-                                llog.warning(f"Error processing favorite category: {str(e)}")
+                                self.llog.warning(f"Error processing favorite category: {str(e)}")
                                 continue
                     except Exception as e:
-                        llog.error(f"Error processing favorite categories: {str(e)}")
+                        self.llog.error(f"Error processing favorite categories: {str(e)}")
                         verified_categories = []
                     # Validate date formats
                     for date_field in ["join_date", "last_login"]:
                         date_value = user.get(date_field)
                         if date_value and not re.match(r'^\d{4}-\d{2}-\d{2}', date_value):
-                            llog.warning(f"Invalid date format for {date_field}: {date_value}")
+                            self.llog.warning(f"Invalid date format for {date_field}: {date_value}")
                             user[date_field] = None
                     # Add validated user
                     self.all_users.append(Data(
@@ -463,12 +462,12 @@ class CustomComponent(Component):
                         }
                     ))
                 except Exception as e:
-                    llog.error(f"Error processing user: {str(e)}")
+                    self.llog.error(f"Error processing user: {str(e)}")
                     continue
-            llog.info(f"Successfully processed {len(self.all_users)} users")
+            self.llog.info(f"Successfully processed {len(self.all_users)} users")
             return self.all_users
         except Exception as e:
-            llog.error(f"Error in create_users: {str(e)}")
+            self.llog.error(f"Error in create_users: {str(e)}")
             return [Data(data={
                 "text": "Error generating users",
                 "error": f"Unexpected error: {str(e)}"
