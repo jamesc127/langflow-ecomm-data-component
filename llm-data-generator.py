@@ -37,8 +37,9 @@ class CustomComponent(Component):
             f"Generate a list of '{self.num_categories}' unique, creative, and diverse top-level categories for an online marketplace focused on the theme of '{self.store_theme}'."
             "Give each category a UUID, name, and description. These categories should be specific to the marketplace theme, but general enough to allow subcategories."
             "For each category, create three subcategories. Each with their own UUID, name, and description. Also include the UUID of the parent category."
-            "Return the answer in JSON format and strictly adhere to the following JSON schema. The response must be a valid JSON array starting with '[' and ending with ']'"
             "Do not format your response as markdown, or include any other text other than properly formatted JSON."
+            "Do not truncate or shorten your response in any way. It is vital that your response only be valid JSON"
+            "Return the answer in JSON format and strictly adhere to the following JSON schema. The response must be a valid JSON array starting with '[' and ending with ']'"
             """
             {
                 "id" : "string",
@@ -63,6 +64,7 @@ class CustomComponent(Component):
             "Return a JSON array where each element represents a product. "
             f"Use only the following categories:\n{json.dumps(category_info, indent=2)}\n"
             "The response must be a valid JSON array starting with '[' and ending with ']'. Do not format your response as markdown, or include any other text other than properly formatted JSON."
+            "Do not truncate or shorten your response in any way. It is vital that your response only be valid JSON"
             "Each product object in the array must follow this exact schema:"
             """
             [
@@ -109,6 +111,7 @@ class CustomComponent(Component):
             "For each user, create a purchase history of 3-5 items from the available products list, "
             "and a list of 2-3 favorite categories from the available categories. "
             "The response must be a valid JSON array starting with '[' and ending with ']'. Do not format your response as markdown, or include any other text other than properly formatted JSON."
+            "Do not truncate or shorten your response in any way. It is vital that your response only be valid JSON"
             "Each user object in the array must follow this exact schema:"
             """
             [
@@ -171,7 +174,7 @@ class CustomComponent(Component):
         Returns: (success: bool, content: str)
         """
         try:
-            self.llog.info(f"Sending prompt for {context}")
+            self.log(f"Sending prompt for {context}")
             response = self.llm.invoke([HumanMessage(content=prompt)])
 
             if not response or not hasattr(response, 'content'):
@@ -182,6 +185,7 @@ class CustomComponent(Component):
             return is_valid, content
 
         except Exception as e:
+            self.log(f"Error invoking LLM for {context}: {str(e)}")
             self.llog.error(f"Error invoking LLM for {context}: {str(e)}")
             return False, str(e)
     def create_categories(self) -> List[Data]:

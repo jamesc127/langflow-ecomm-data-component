@@ -1,0 +1,92 @@
+[
+    0: {
+    id: "f4d3c6a4-7a5b-4c6d-8a7b-6c4d3b2a7a7a"
+    name: "Footwear"
+    description: "Running shoes, trail shoes, and other footwear for running enthusiasts."
+    popularity_score: 9
+    is_subcategory: false
+    parent_id: "null"
+    text: "Footwear"
+    metadata: "Running shoes, trail shoes, and other footwear for running enthusiasts."
+    }
+    1: {
+    id: "a1b2c3d4-e5f6-g7h8-i9j0-k1l2m3n4o5"
+    name: "Accessories"
+    description: "Belt, hat, sunglasses, and other accessories for runners."
+    popularity_score: 8
+    is_subcategory: false
+    parent_id: "null"
+    text: "Accessories"
+    metadata: "Belt, hat, sunglasses, and other accessories for runners."
+    }
+    2: {
+    id: "c1d2e3f4-g5h6-i7j8-k9l0-m1n2o3p4"
+    name: "Gear"
+    description: "Heart rate monitors, GPS watches, and other gear for tracking and monitoring running performance."
+    popularity_score: 7
+    is_subcategory: false
+    parent_id: "null"
+    text: "Gear"
+    metadata: "Heart rate monitors, GPS watches, and other gear for tracking and monitoring running performance."
+    }
+    3: {
+    id: "e1f2g3h4-i5j6-k7l8-m9n0-o1p2q3r4"
+    name: "Trail Running"
+    description: "Equipment and gear for trail running, including shoes and accessories."
+    popularity_score: 6
+    is_subcategory: true
+    parent_id: "f4d3c6a4-7a5b-4c6d-8a7b-6c4d3b2a7a7a"
+    text: "Trail Running"
+    metadata: "Equipment and gear for trail running, including shoes and accessories."
+    }
+    4: {
+    id: "g1h2i3j4-k5l6-m7n8-o9p0-q1r2s3t4"
+    name: "Running Shorts"
+    description: "Running shorts for men and women, including features like pockets and breathable fabrics."
+    popularity_score: 5
+    is_subcategory: true
+    parent_id: "f4d3c6a4-7a5b-4c6d-8a7b-6c4d3b2a7a7a"
+    text: "Running Shorts"
+    metadata: "Running shorts for men and women, including features like pockets and breathable fabrics."
+    }
+    5: {
+    id: "i1j2k3l4-m5n6-o7p8-q9r0-s1t2u3v4"
+    name: "Running Hats"
+    description: "Running hats for men and women, including features like sweat-wicking fabrics and adjustable straps..."
+    popularity_score: 4
+    is_subcategory: true
+    parent_id: "a1b2c3d4-e5f6-g7h8-i9j0-k1l2m3n4o5"
+    text: "Running Hats"
+    metadata: "Running hats for men and women, including features like sweat-wicking fabrics and adjustable straps..."
+    }
+    6: {
+    id: "k1l2m3n4-o5p6-q7r8-s9t0-u1v2w3x4"
+    name: "GPS Watches"
+    description: "GPS watches for tracking running performance, including features like heart rate monitoring and rou..."
+    popularity_score: 3
+    is_subcategory: true
+    parent_id: "c1d2e3f4-g5h6-i7j8-k9l0-m1n2o3p4"
+    text: "GPS Watches"
+    metadata: "GPS watches for tracking running performance, including features like heart rate monitoring and rou..."
+    }
+    7: {
+    id: "m1n2o3p4-q5r6-s7t8-u9v0-w1x2y3z4"
+    name: "Heart Rate Monitors"
+    description: "Heart rate monitors for tracking running performance, including features like real-time heart rate ..."
+    popularity_score: 2
+    is_subcategory: true
+    parent_id: "c1d2e3f4-g5h6-i7j8-k9l0-m1n2o3p4"
+    text: "Heart Rate Monitors"
+    metadata: "Heart rate monitors for tracking running performance, including features like real-time heart rate ..."
+    }
+    8: {
+    id: "o1p2q3r4-s5t6-u7v8-w9x0-y1z2a3b4"
+    name: "Trail Running Shoes"
+    description: "Trail running shoes for men and women, including features like aggressive tread and breathable fabr..."
+    popularity_score: 1
+    is_subcategory: true
+    parent_id: "f4d3c6a4-7a5b-4c6d-8a7b-6c4d3b2a7a7a"
+    text: "Trail Running Shoes"
+    metadata: "Trail running shoes for men and women, including features like aggressive tread and breathable fabr..."
+    }
+]
