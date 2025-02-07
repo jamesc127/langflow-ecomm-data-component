@@ -1,16 +1,14 @@
-from typing import TYPE_CHECKING, cast
-
+from typing import TYPE_CHECKING, cast, List
 from pydantic import BaseModel, Field, create_model
-
 from langflow.base.models.chat_result import get_chat_result
 from langflow.custom import Component
 from langflow.helpers.base_model import build_model_from_schema
 from langflow.io import BoolInput, HandleInput, MessageTextInput, Output, StrInput, TableInput
 from langflow.schema.data import Data
+from loguru import logger
 
 if TYPE_CHECKING:
     from langflow.field_typing.constants import LanguageModel
-
 
 class StructuredOutputComponent(Component):
     display_name = "Structured Output"
@@ -93,7 +91,7 @@ class StructuredOutputComponent(Component):
         Output(name="structured_output", display_name="Structured Output", method="build_structured_output"),
     ]
 
-    def build_structured_output(self) -> Data:
+    def build_structured_output(self) -> List[Data]:
         schema_name = self.schema_name or "OutputModel"
 
         if not hasattr(self.llm, "with_structured_output"):
@@ -111,21 +109,57 @@ class StructuredOutputComponent(Component):
             )
         else:
             output_model = output_model_
+        
         try:
             llm_with_structured_output = cast("LanguageModel", self.llm).with_structured_output(schema=output_model)  # type: ignore[valid-type, attr-defined]
-
         except NotImplementedError as exc:
             msg = f"{self.llm.__class__.__name__} does not support structured output."
             raise TypeError(msg) from exc
+            
         config_dict = {
             "run_name": self.display_name,
             "project_name": self.get_project_name(),
             "callbacks": self.get_langchain_callbacks(),
         }
+        
         output = get_chat_result(runnable=llm_with_structured_output, input_value=self.input_value, config=config_dict)
-        if isinstance(output, BaseModel):
-            output_dict = output.model_dump()
-        else:
+        
+        if not isinstance(output, BaseModel):
             msg = f"Output should be a Pydantic BaseModel, got {type(output)} ({output})"
             raise TypeError(msg)
-        return Data(data=output_dict)
+
+        # Log the raw output for debugging
+        self.log(f"Raw LLM output: {output}")
+        
+        output_dict = output.model_dump()
+        self.log(f"Dumped output dict: {output_dict}")
+        
+        result: List[Data] = []
+        
+        try:
+            if self.multiple:
+                if "objects" not in output_dict:
+                    msg = "Multiple output mode requires 'objects' field in response"
+                    raise ValueError(msg)
+                    
+                objects = output_dict["objects"]
+                if not isinstance(objects, list):
+                    msg = f"Expected list for 'objects', got {type(objects)}"
+                    raise TypeError(msg)
+                    
+                result = [Data(data=item) for item in objects]
+            else:
+                # For single output, we wrap the entire output in a list
+                result = [Data(data=output_dict)]
+                
+            # Validate we have at least one item
+            if not result:
+                msg = "No valid outputs were generated"
+                raise ValueError(msg)
+                
+            return result
+            
+        except Exception as e:
+            self.log(f"Error processing output: {str(e)}")
+            self.log(f"Output dict was: {output_dict}")
+            raise

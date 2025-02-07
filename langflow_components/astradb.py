@@ -595,7 +595,7 @@ class AstraDBVectorStoreComponent(LCVectorStoreComponent):
                 # Astra DB Usage Tracking Parameters
                 ext_callers=[(f"{langflow_prefix}langflow", __version__)],
                 # Astra DB Vector Store Parameters
-                autodetect_collection = False, #not is_new_collection,
+                autodetect_collection = not is_new_collection,
                 content_field = self.content_field or "*",
                 ignore_invalid_documents = self.ignore_invalid_documents,
                 # **autodetect_params or {},
@@ -612,8 +612,10 @@ class AstraDBVectorStoreComponent(LCVectorStoreComponent):
 
     def _add_documents_to_vector_store(self, vector_store) -> None:
         documents = []
+        self.log(self.ingest_data)
         for _input in self.ingest_data or []:
             if isinstance(_input, Data):
+                self.log(f"_input is Data type {str(_input)}")
                 documents.append(_input.to_lc_document())
             else:
                 msg = "Vector Store Inputs must be Data objects."
